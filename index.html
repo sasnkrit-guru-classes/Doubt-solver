@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEE Advanced AI Tutor | Gemini 3 Pro</title>
+
+    <!-- 1. Puter.js (No API Key needed) -->
+    <script src="https://js.puter.com/v2/"></script>
+
+    <!-- 2. Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- 3. MathJax for LaTeX (Math Formulas) -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- 4. PDF.js for Reading PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;     /* GitHub Dark Dimmed */
+            --bg-secondary: #161b22;
+            --border-color: #30363d;
+            --accent-color: #2f81f7;   /* Blue */
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --user-bubble: #1f6feb;
+            --ai-bubble: #161b22;
+            --success: #238636;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            padding: 15px 20px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.5px; }
+        header span.badge {
+            background: #238636; color: white; padding: 2px 8px; 
+            border-radius: 12px; font-size: 0.75rem; font-weight: bold;
+        }
+
+        /* --- Chat Area --- */
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 10px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .message-content {
+            padding: 15px 20px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 1rem;
+            position: relative;
+        }
+
+        /* User Style */
+        .user-msg { text-align: right; }
+        .user-msg .message-content {
+            background-color: var(--user-bubble);
+            color: white;
+            display: inline-block;
+            text-align: left;
+            border-bottom-right-radius: 2px;
+        }
+
+        /* AI Style */
+        .ai-msg .message-content {
+            background-color: var(--ai-msg);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 2px;
+            width: 100%; 
+        }
+
+        .ai-name { font-size: 0.8rem; color: var(--accent-color); margin-bottom: 5px; font-weight: bold; }
+        
+        /* Markdown/LaTeX overrides */
+        .ai-msg pre { background: #00000055; padding: 10px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border-color); }
+        .ai-msg code { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        .ai-msg p { margin-bottom: 10px; }
+        .ai-msg ul, .ai-msg ol { margin-left: 20px; margin-bottom: 10px; }
+        
+        /* MathJax Font Size */
+        mjx-container { font-size: 110% !important; }
+
+        /* --- Input Area --- */
+        #input-container {
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .input-wrapper {
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+        }
+
+        #file-preview-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .preview-chip {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .preview-chip img { height: 30px; border-radius: 4px; }
+        .preview-chip button { background: none; border: none; color: #ff6b6b; cursor: pointer; font-weight: bold; }
+
+        .input-box {
+            display: flex;
+            gap: 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            resize: none;
+            height: 50px;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        /* Buttons */
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+        .icon-btn:hover { color: var(--text-primary); }
+
+        #send-btn {
+            background-color: var(--success);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        #send-btn:hover { opacity: 0.9; }
+        #send-btn:disabled { background-color: var(--border-color); cursor: not-allowed; }
+
+        input[type="file"] { display: none; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>JEE Advanced AI Tutor</h1>
+    <span class="badge">Gemini 3 Pro Preview</span>
+</header>
+
+<div id="chat-window">
+    <div class="message ai-msg">
+        <div class="message-content">
+            <div class="ai-name">TUTOR</div>
+            Hello! I am your <strong>JEE Advanced & Boards</strong> assistant running on <strong>Gemini 3 Pro</strong>. 
+            <br><br>
+            I strictly specialize in:
+            <ul>
+                <li>Physics, Chemistry, Maths</li>
+                <li>English & Physical Education</li>
+                <li>Career Counselling</li>
+            </ul>
+            <br>
+            Upload your questions (Image or PDF) or type a doubt. I will use LaTeX for mathematical precision.
+        </div>
+    </div>
+</div>
+
+<div id="input-container">
+    <div class="input-wrapper">
+        <div id="file-preview-area"></div>
+        
+        <div class="input-box">
+            <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Upload Image or PDF">
+                <!-- Paperclip Icon -->
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+            </button>
+            <input type="file" id="file-input" accept="image/*,.pdf">
+
+            <textarea id="user-input" placeholder="Ask a doubt..." onkeydown="handleEnter(event)"></textarea>
+            
+            <button id="send-btn" onclick="sendMessage()">SOLVE</button>
+        </div>
+    </div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 10px;">
+        Powered by Puter.js • Unlimited Free Access
+    </div>
+</div>
+
+<script>
+    // --- 1. CONFIGURATION ---
+    const MODEL_NAME = 'gemini-3-pro-preview'; // As per your link
+    
+    // PDF Worker Setup
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // System Persona (Injected into every prompt)
+    const SYSTEM_INSTRUCTION = `
+    ROLE: You are an expert JEE Advanced and Class 12 CBSE Board Tutor.
+    SUBJECTS ALLOWED: Physics, Chemistry, Maths, English, Physical Education, Career Counselling.
+    RULES:
+    1. If the user asks about anything else (movies, politics, coding unrelated to studies), politely refuse.
+    2. FORMAT: Use LaTeX for ALL math/science formulas.
+       - Inline: $ equation $
+       - Block: $$ equation $$
+    3. TONE: Serious, academic, motivating, concise.
+    4. IMAGE/PDF: If an image/text is provided, solve the specific question in it.
+    `;
+
+    // State
+    let currentAttachment = null; // Stores { type: 'image'|'text', data: 'base64...' }
+    let chatHistoryContext = ""; // We append past Q&A here to give the model "memory" manually
+
+    // --- 2. FILE HANDLING ---
+    const fileInput = document.getElementById('file-input');
+    const previewArea = document.getElementById('file-preview-area');
+
+    fileInput.addEventListener('change', async (e) => {
+        if (e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        // Clear previous attachment (Single file mode for simplicity with Puter's simple chat API)
+        currentAttachment = null;
+        previewArea.innerHTML = '<div class="preview-chip">Processing...</div>';
+
+        try {
+            if (file.type.startsWith('image/')) {
+                // Convert Image to Base64
+                const base64 = await toBase64(file);
+                currentAttachment = { type: 'image', data: base64, name: file.name };
+                showPreview(file.name, true, base64);
+            } else if (file.type === 'application/pdf') {
+                // Extract Text from PDF
+                const text = await extractPdfText(file);
+                currentAttachment = { type: 'text', data: text, name: file.name };
+                showPreview(file.name, false);
+            }
+        } catch (err) {
+            console.error(err);
+            previewArea.innerHTML = '<div class="preview-chip" style="color:red">Error loading file</div>';
+        }
+        fileInput.value = ''; // Reset input
+    });
+
+    function showPreview(name, isImage, src = null) {
+        previewArea.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'preview-chip';
+        div.innerHTML = `
+            ${isImage ? `<img src="${src}">` : '📄'} 
+            <span>${name}</span>
+            <button onclick="clearAttachment()">×</button>
+        `;
+        previewArea.appendChild(div);
+    }
+
+    function clearAttachment() {
+        currentAttachment = null;
+        previewArea.innerHTML = '';
+    }
+
+    // --- 3. CHAT LOGIC ---
+    async function sendMessage() {
+        const inputField = document.getElementById('user-input');
+        const userText = inputField.value.trim();
+        const sendButton = document.getElementById('send-btn');
+
+        if (!userText && !currentAttachment) return;
+
+        // UI Updates
+        inputField.disabled = true;
+        sendButton.disabled = true;
+        sendButton.innerText = "Thinking...";
+        
+        // 1. Render User Message
+        appendMessage('user', userText, currentAttachment);
+
+        // 2. Prepare Prompt
+        // Since Puter.js simple chat is stateless, we prepend the System Prompt + Short History + Current extracted PDF text
+        let fullPrompt = `${SYSTEM_INSTRUCTION}\n\n`;
+
+        // If we have history, add last 2 turns to keep context (simple memory)
+        fullPrompt += chatHistoryContext;
+
+        // If attachment is text (PDF), add it to prompt
+        if (currentAttachment && currentAttachment.type === 'text') {
+            fullPrompt += `\n[CONTEXT FROM PDF FILE '${currentAttachment.name}':]\n${currentAttachment.data}\n\n`;
+        }
+        
+        // Add current question
+        fullPrompt += `\nSTUDENT QUESTION: ${userText}`;
+
+        // Prepare Arguments for Puter
+        let puterArgs = [fullPrompt]; // First arg is always text
+        
+        // If attachment is image, add URL/Base64 as second arg (per doc)
+        if (currentAttachment && currentAttachment.type === 'image') {
+            puterArgs.push(currentAttachment.data); 
+        }
+
+        // Add Configuration (Model + Stream)
+        puterArgs.push({
+            model: MODEL_NAME,
+            stream: true
+        });
+
+        // 3. Clear Input immediately
+        inputField.value = '';
+        const savedAttachment = currentAttachment; // Keep ref for UI
+        clearAttachment();
+
+        // 4. Create AI Message Bubble (Empty initially)
+        const aiMessageDiv = createAiMessageDiv();
+        const contentDiv = aiMessageDiv.querySelector('.message-content');
+        let fullResponseText = "";
+
+        try {
+            // CALL PUTER AI
+            // usage: puter.ai.chat(prompt, [image], options)
+            const response = await puter.ai.chat(...puterArgs);
+
+            // STREAM THE RESPONSE
+            for await (const part of response) {
+                if (part?.text) {
+                    fullResponseText += part.text;
+                    // Real-time render
+                    contentDiv.innerHTML = `<div class="ai-name">TUTOR</div>` + marked.parse(fullResponseText);
+                    // Live MathJax rendering (optional, but can be glitchy during stream, best to wait till end usually, 
+                    // but we can try simple formatting here if needed. We'll wait for end for heavy math)
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                }
+            }
+
+            // Final Render (Formatting & MathJax)
+            contentDiv.innerHTML = `<div class="ai-name">TUTOR</div>` + marked.parse(fullResponseText);
+            MathJax.typesetPromise([contentDiv]);
+
+            // Save to History (Text only to save tokens)
+            chatHistoryContext += `Student: ${userText}\nTutor: ${fullResponseText}\n`;
+
+        } catch (error) {
+            console.error(error);
+            contentDiv.innerHTML += `<br><br><span style="color:#ff6b6b">Error: ${error.message}</span>`;
+        } finally {
+            inputField.disabled = false;
+            sendButton.disabled = false;
+            sendButton.innerText = "SOLVE";
+            inputField.focus();
+        }
+    }
+
+    // --- 4. HELPER FUNCTIONS ---
+
+    const chatWindow = document.getElementById('chat-window');
+
+    function createAiMessageDiv() {
+        const div = document.createElement('div');
+        div.className = 'message ai-msg';
+        div.innerHTML = `<div class="message-content"><span style="animation:blink 1s infinite">Thinking...</span></div>`;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        return div;
+    }
+
+    function appendMessage(role, text, attachment) {
+        const div = document.createElement('div');
+        div.className = `message ${role}-msg`;
+        
+        let html = '';
+        if (attachment && attachment.type === 'image') {
+            html += `<img src="${attachment.data}" style="max-height: 200px; border-radius: 8px; margin-bottom: 8px; display:block;">`;
+        }
+        if (attachment && attachment.type === 'text') {
+            html += `<div style="font-size:0.8rem; opacity:0.8; margin-bottom:5px;">📄 Attached: ${attachment.name}</div>`;
+        }
+        
+        // Escape HTML for user input to prevent XSS
+        const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        html += safeText.replace(/\n/g, '<br>');
+
+        div.innerHTML = `<div class="message-content">${html}</div>`;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // Convert File to Base64
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
+    // Extract PDF Text
+    async function extractPdfText(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        let text = "";
+        // Limit to first 10 pages to prevent token overflow
+        const maxPages = Math.min(pdf.numPages, 10); 
+        for (let i = 1; i <= maxPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map(item => item.str).join(" ") + "\n";
+        }
+        return text;
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+</script>
+
+</body>
+</html>
